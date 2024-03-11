@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 from rabbit_client import RabbitClient
+#"amqp://admin:admin@vm-inv.todes.by:15672//%2F"
 
 SERVICE = 'TestService'
 

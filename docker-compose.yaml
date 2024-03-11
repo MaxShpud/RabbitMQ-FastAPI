@@ -2,7 +2,7 @@ version: '3.7'
 
 services:
 
-  rabbitmq1:
+  rabbitmq:
     build:
       context: .
       dockerfile: Dockerfile.rabbitmq

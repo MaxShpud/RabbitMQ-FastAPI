@@ -35,15 +35,24 @@ class RabbitClient:
 
     # ---------------------------------------------------------
     #
-    async def _process_incoming_message(self, message: AbstractIncomingMessage):
+    @staticmethod
+    async def _process_incoming_message(message: AbstractIncomingMessage):
         """ Processing incoming message from RabbitMQ.
 
         :param message: Received message.
         """
-        if body := message.body:
-            await self.message_handler(json.loads(body))
 
-        await message.ack()
+        # if message.body:
+        #     print(message.routing_key.title())
+        #     await self.message_handler(json.loads(message.body))
+        #
+        # await message.ack()
+
+        async with message.process():
+            if message.routing_key == 'file-storage.get-file.query':
+                print("GET ", message.body)
+            if message.routing_key == 'file-storage.post-file.command':
+                print("POST ", message.body)
 
     # ---------------------------------------------------------
     #
@@ -57,11 +66,21 @@ class RabbitClient:
         # Creating receive channel and setting quality of service.
         channel = await connection.channel()
 
+        # Creating exchange
+        await channel.declare_exchange(name='ic-exchange', type='topic')
+
+        # Getting exchange
+        await channel.get_exchange(name='ic-exchange')
+
         # To make sure the load is evenly distributed between the workers.
         await channel.set_qos(1)
 
         # Creating a receive queue.
         queue = await channel.declare_queue(name=self.service_name, durable=True)
+
+        # Binding queues
+        await queue.bind(exchange='ic-exchange', routing_key='file-storage.get-file.query')
+        await queue.bind(exchange='ic-exchange', routing_key='file-storage.post-file.command')
 
         # Start consumption of existing and future messages.
         await queue.consume(self._process_incoming_message, no_ack=False)
@@ -71,7 +90,7 @@ class RabbitClient:
     # ---------------------------------------------------------
     #
     @classmethod
-    async def send_message(cls, message: dict, queue: str):
+    async def send_message(cls, message: dict, routing_key: str):
         """ Send message to RabbitMQ Publisher queue.
 
         If the topic is defined, topic message routing is used, otherwise
@@ -84,9 +103,13 @@ class RabbitClient:
         connection = await connect(url=cls.rabbit_url)
         channel = await connection.channel()
 
+        exchange = await channel.get_exchange(name='ic-exchange')
+
         message_body = Message(
             content_type='application/json',
             body=json.dumps(message, ensure_ascii=False).encode(),
-            delivery_mode=DeliveryMode.PERSISTENT)
-        await channel.default_exchange.publish(
-            routing_key=queue, message=message_body)
+            delivery_mode=DeliveryMode.PERSISTENT, reply_to=f"HELLO {message}")
+
+        await exchange.publish(message=message_body, routing_key=routing_key)
+
+        #await channel.default_exchange.publish(routing_key=queue, message=message_body)
