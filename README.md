@@ -1,0 +1,1 @@
+This repository demonstrates how to integrate FastAPI, a modern, fast (high-performance), web framework for building APIs with Python 3.6+ based on standard Python type hints, with RabbitMQ, a robust message broker for building distributed applications.
